@@ -2,15 +2,14 @@ name := "websocket-akka-http"
 
 version := "1.0"
 
-scalaVersion := "2.11.7"
 
-libraryDependencies ++= {
-  val akkaHttpVersion = "1.0-RC4"
+scalaVersion := "2.12.11"
 
-  Seq(
-    "com.typesafe.akka" %% "akka-stream-experimental" % akkaHttpVersion,
-    "com.typesafe.akka" %% "akka-http-core-experimental" % akkaHttpVersion,
-    "com.typesafe.akka" %% "akka-http-experimental" % akkaHttpVersion,
-    "org.java-websocket" % "Java-WebSocket" % "1.3.0"
-  )
-}
+libraryDependencies ++= Seq(
+  "com.typesafe.akka" %% "akka-http" % "10.1.3",
+  "com.typesafe.akka" %% "akka-stream" % "2.5.14",
+
+  // TEST
+  "org.scalatest" %% "scalatest" % "3.0.5" % Test,
+  "com.typesafe.akka" %% "akka-http-testkit" % "10.1.3" % Test
+)

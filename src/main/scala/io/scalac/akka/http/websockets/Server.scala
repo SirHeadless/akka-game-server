@@ -30,24 +30,24 @@ object Server extends App {
   /**
    * Run WSClient when `with-client` argument is provided
    */
-  alternativelyRunTheClient()
+//  alternativelyRunTheClient()
 
-  StdIn.readLine()
+//  StdIn.readLine()
+//
+//  import actorSystem.dispatcher
+//
+//  binding.flatMap(_.unbind()).onComplete(_ => actorSystem.shutdown())
+//  println("Server is down...")
 
-  import actorSystem.dispatcher
-
-  binding.flatMap(_.unbind()).onComplete(_ => actorSystem.shutdown())
-  println("Server is down...")
-
-  private def alternativelyRunTheClient(): Unit = {
-
-    if (args.headOption.map(_.equalsIgnoreCase("with-client")).getOrElse(false)) {
-      val c: WSClient = WSClient("http://localhost:8080/ws-chat/123?name=HAL1000", "HAL1000")
-
-      if (c.connectBlocking())
-        c.spam("hello message")
-    }
-
-  }
+//  private def alternativelyRunTheClient(): Unit = {
+//
+//    if (args.headOption.map(_.equalsIgnoreCase("with-client")).getOrElse(false)) {
+//      val c: WSClient = WSClient("http://localhost:8080/ws-chat/123?name=HAL1000", "HAL1000")
+//
+//      if (c.connectBlocking())
+//        c.spam("hello message")
+//    }
+//
+//  }
 
 }

@@ -2,19 +2,19 @@ package io.scalac.akka.http.websockets.chat
 
 import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
-import akka.stream.OverflowStrategy
-import akka.stream.scaladsl.FlowGraph.Implicits._
-import akka.stream.scaladsl._
+import akka.stream.{FlowShape, OverflowStrategy}
+import akka.stream.scaladsl.GraphDSL.Implicits._
+import akka.stream.scaladsl.{Source, _}
 
 class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
 
   private[this] val chatRoomActor = actorSystem.actorOf(Props(classOf[ChatRoomActor], roomId))
 
-  def websocketFlow(user: String): Flow[Message, Message, _] =
-    Flow(Source.actorRef[ChatMessage](bufferSize = 5, OverflowStrategy.fail)) {
-      implicit builder =>
-        chatSource => //source provideed as argument
 
+  def websocketFlow(user: String): Flow[Message, Message, _] =
+    Flow.fromGraph(GraphDSL.create(Source.actorRef[ChatMessage](bufferSize = 5, OverflowStrategy.fail))  {
+      implicit builder =>
+        chatSource =>
           //flow used as input it takes Message's
           val fromWebsocket = builder.add(
             Flow[Message].collect {
@@ -24,7 +24,8 @@ class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
           //flow used as output, it returns Message's
           val backToWebsocket = builder.add(
             Flow[ChatMessage].map {
-              case ChatMessage(author, text) => TextMessage(s"[$author]: $text")
+//              case ChatMessage(author, text) => TextMessage(s"[$author]: $text")
+              case ChatMessage(author, text) => TextMessage(text)
             }
           )
 
@@ -49,9 +50,8 @@ class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
           //Actor already sit in chatRoom so each message from room is used as source and pushed back into websocket
           chatSource ~> backToWebsocket
 
-          // expose ports
-          (fromWebsocket.inlet, backToWebsocket.outlet)
-    }
+          FlowShape(fromWebsocket.in , backToWebsocket.out)
+    })
 
   def sendMessage(message: ChatMessage): Unit = chatRoomActor ! message
 

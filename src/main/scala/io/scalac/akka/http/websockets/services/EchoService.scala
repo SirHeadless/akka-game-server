@@ -9,7 +9,7 @@ object EchoService {
 
   def route: Route = path("ws-echo") {
     get {
-      handleWebsocketMessages(echoService)
+      handleWebSocketMessages(echoService)
     }
   }
 
