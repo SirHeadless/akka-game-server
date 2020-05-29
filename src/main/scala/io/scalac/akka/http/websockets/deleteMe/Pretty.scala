@@ -38,20 +38,30 @@ object Pretty {
 
 }
 
+final class RichPretty[T](val x: T) /*extends AnyVal*/ {
+
+  def richPretty(implicit ev: Pretty[T]): String =
+    ev.pretty(x)
+
+}
 
 
 
 object Test extends App {
   implicit def callMeHowYouLikeJustDontCallMe[T: Pretty](x: T): RichPretty[T] = new RichPretty(x)
+//  def callMeHowYouLikeJustDontCallMe[T: Pretty](x: T): RichPretty[T] = new RichPretty(x)
 
+//  implicit def implPretty[T: Pretty](x: T): Pretty[T] = Pretty(x)
 
   def printPretty[X: Pretty](x: X): Unit =
-    println(x.richPretty)
+    println(callMeHowYouLikeJustDontCallMe(x).richPretty)
 
-  def printPretty2[X: Pretty](x: X): Unit =
-    println(new RichPretty[X](x).richPretty)
+//  def printPretty2[X: Pretty](x: X): Unit =
+//    println(x.pretty)
 
 
+  printPretty(Some(true))
+  printPretty(None)
   printPretty("Hallo")
   printPretty(1)
   printPretty(List("Hallo", "Moin"))
