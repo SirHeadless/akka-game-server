@@ -67,9 +67,10 @@ class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
     case msg: IncomingMessage =>
       // TODO: Implement a better protocol to send messages (msgpack.org?)
       val stringCoords: Array[String] = msg.message.split(",")
+      val player = participants(msg.sender)._1
       // TODO look scala course about TRY and see if you can improve the following commands
       val result: Try[Either[String, GameState]] =  Try((stringCoords(0).toInt, stringCoords(1).toInt))
-        .map(coords =>{ println(coords); gameState.makeMove(Move(participants(msg.sender)._1, coords))})
+        .map(coords =>{ println(coords); gameState.makeMove(Move(player, coords))})
 
       result match {
         case Success(value) => {
@@ -78,7 +79,7 @@ class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
               // If left send the whole game state to the sender
               println(failure)
             case Right(gameState) =>
-              broadcast(participants, msg, spectators)
+              broadcast(participants, msg.message + s",${getPlayerMessageCode(player)}", spectators)
               context.become(filedChatRoom(participants, spectators, gameState))
           }
         }
@@ -103,7 +104,12 @@ class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
       case _ => false
     }
     // make implicit
-    override val rows: Int = 7
-    override val maxColumns: Int = 10
+    override val maxColumns: Int = 7
+    override val rows: Int = 10
+  }
+
+  def getPlayerMessageCode(player: Player): Int = player match {
+    case GreenPlayer(_) => 0
+    case YellowPlayer(_) => 1
   }
 }

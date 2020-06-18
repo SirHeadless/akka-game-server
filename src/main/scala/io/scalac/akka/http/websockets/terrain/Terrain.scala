@@ -34,14 +34,14 @@ case class OffsetCoords(x: Int, y: Int) extends Pos {
 }
 
 trait Terrain {
-
+  // TODO Rename it
   val rows: Int
   val maxColumns: Int
 
   def terrainFunction: Pos => Boolean = pos => pos.getOffsetCoords match{
     case OffsetCoords(row,col) =>
-      val offset = rows % 2
-      row < rows && row >= 0 && col >= 0 && col < (maxColumns - offset)
+      val offset = col % 2
+      row < (rows - offset) && row >= 0 && col >= 0 && col < maxColumns
   }
 
 }
