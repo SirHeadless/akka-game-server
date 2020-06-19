@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import io.scalac.akka.http.websockets.state.{GameState, GreenPlayer, Move, Player, YellowPlayer}
 import io.scalac.akka.http.websockets.terrain.OffsetCoords
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 
 class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
 
@@ -95,6 +95,8 @@ class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
     spectators.values.foreach(_ ! message)
   }
 
+  // Is this still functional or do I have to inject the Random.nextInt
+  val values: List[List[Int]] = (rows, maxColumns) => List.tabulate(rows)(n => if (n % 2 == 0) List.fill(maxColumns)(Random.nextInt) else List.fill(maxColumns - 1)(Random.nextInt)  )
 
   val startGame: GameState = new GameState {
     override val moves: List[Move] = List.empty

@@ -2,6 +2,8 @@ package io.scalac.akka.http.websockets.state
 
 import io.scalac.akka.http.websockets.terrain.{Pos, Terrain}
 
+import scala.util.Random
+
 trait GameSymbol {
   val pos: Pos
 }
@@ -20,7 +22,7 @@ case class YellowPlayer(name: String) extends Player
 
 case class Move(player: Player, pos: Pos)
 
-trait GameState extends Terrain {
+trait GameState(values: List[List[Int]]) extends Terrain {
   self =>
 
   val moves: List[Move]
@@ -29,8 +31,8 @@ trait GameState extends Terrain {
 
   def makeMove(move: Move): Either[String, GameState] = move match {
     case Move(player, pos) =>
-      if (!isTurn(player)) {print("I was here"); Left(s"It is not the turn of ${player}")}
-      else if (!terrainFunction(pos)) {print("I was here too"); Left(s"Pos ${pos} is not on the board")}
+      if (!isTurn(player)) Left(s"It is not the turn of ${player}")
+      else if (!terrainFunction(pos)) Left(s"Pos ${pos} is not on the board")
       else {
         if (moves.map(_.pos).contains(pos)) Left(s"Move ${move} not possible. Field already filled")
         else Right(new GameState {
@@ -41,5 +43,7 @@ trait GameState extends Terrain {
         })
       }
   }
+
+
 
 }
