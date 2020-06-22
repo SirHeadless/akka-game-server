@@ -2,7 +2,7 @@ package io.scalac.akka.http.websockets.chat
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import io.scalac.akka.http.websockets.state.{GameState, GreenPlayer, Move, Player, YellowPlayer}
-import io.scalac.akka.http.websockets.terrain.OffsetCoords
+import io.scalac.akka.http.websockets.terrain.{OffsetCoords, Pos}
 
 import scala.util.{Failure, Random, Success, Try}
 
@@ -96,7 +96,7 @@ class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
   }
 
   // Is this still functional or do I have to inject the Random.nextInt
-  val values: List[List[Int]] = (rows, maxColumns) => List.tabulate(rows)(n => if (n % 2 == 0) List.fill(maxColumns)(Random.nextInt) else List.fill(maxColumns - 1)(Random.nextInt)  )
+  val values: (Int, Int) => List[List[Int]] = (rows, maxColumns) => List.tabulate(rows)(n => if (n % 2 == 0) List.fill(maxColumns)(Random.nextInt) else List.fill(maxColumns - 1)(Random.nextInt)  )
 
   val startGame: GameState = new GameState {
     override val moves: List[Move] = List.empty
@@ -108,6 +108,9 @@ class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
     // make implicit
     override val maxColumns: Int = 7
     override val rows: Int = 10
+    override val valences: List[List[Int]] = values(rows, maxColumns)
+    override val capturedFieldsYellow: List[Pos] = List.empty
+    override val capturedFieldsGreen: List[Pos] = List.empty
   }
 
   def getPlayerMessageCode(player: Player): Int = player match {
