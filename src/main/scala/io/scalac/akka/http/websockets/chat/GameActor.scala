@@ -6,7 +6,7 @@ import io.scalac.akka.http.websockets.terrain.{OffsetCoords, Pos}
 
 import scala.util.{Failure, Random, Success, Try}
 
-class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
+class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case UserLeft(name) => log.warning(s"Not existing user ${name} left the chat room ${roomId}")
@@ -22,7 +22,9 @@ class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
     case UserJoined(name, actorRef) =>  {
       println(s"User $name joined channel[$roomId]")
       broadcast(participants, s"User $name joined channel[$roomId]")
-      context.become(filedChatRoom(participants + (name -> (YellowPlayer(name), actorRef)), Map.empty, startGame))
+      val updatedParticipants = participants + (name -> (YellowPlayer(name), actorRef))
+      broadcast(updatedParticipants, startGame.valences.toString())
+      context.become(filedChatRoom(updatedParticipants, Map.empty, startGame))
     }
 
 //    case msg: IncomingMessage => broadcast(participants, msg)
@@ -96,7 +98,7 @@ class ChatRoomActor(roomId: Int) extends Actor with ActorLogging {
   }
 
   // Is this still functional or do I have to inject the Random.nextInt
-  val values: (Int, Int) => List[List[Int]] = (rows, maxColumns) => List.tabulate(rows)(n => if (n % 2 == 0) List.fill(maxColumns)(Random.nextInt) else List.fill(maxColumns - 1)(Random.nextInt)  )
+  val values: (Int, Int) => List[List[Int]] = (rows, maxColumns) => List.tabulate(rows)(n => if (n % 2 == 0) List.fill(maxColumns)(Random.nextInt(6) + 1) else List.fill(maxColumns - 1)(Random.nextInt(6) + 1)  )
 
   val startGame: GameState = new GameState {
     override val moves: List[Move] = List.empty

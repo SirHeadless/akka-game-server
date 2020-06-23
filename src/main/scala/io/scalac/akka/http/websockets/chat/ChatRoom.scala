@@ -8,7 +8,7 @@ import akka.stream.scaladsl.{Source, _}
 
 class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
 
-  private[this] val chatRoomActor = actorSystem.actorOf(Props(classOf[ChatRoomActor], roomId))
+  private[this] val gameActor = actorSystem.actorOf(Props(classOf[GameActor], roomId, 7, 10))
 
 
   def websocketFlow(user: String): Flow[Message, Message, _] =
@@ -30,7 +30,7 @@ class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
           )
 
           //send messages to the actor, if send also UserLeft(user) before stream completes.
-          val chatActorSink = Sink.actorRef[ChatEvent](chatRoomActor, UserLeft(user))
+          val chatActorSink = Sink.actorRef[ChatEvent](gameActor, UserLeft(user))
 
           //merges both pipes
           val merge = builder.add(Merge[ChatEvent](2))
@@ -44,7 +44,7 @@ class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
           //If Source actor is just created should be send as UserJoined and registered as particiant in room
           actorAsSource ~> merge.in(1)
 
-          //Merges both pipes above and forward messages to chatroom Represented by ChatRoomActor
+          //Merges both pipes above and forward messages to chatroom Represented by gameActor
           merge ~> chatActorSink
 
           //Actor already sit in chatRoom so each message from room is used as source and pushed back into websocket
@@ -53,7 +53,7 @@ class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
           FlowShape(fromWebsocket.in , backToWebsocket.out)
     })
 
-  def sendMessage(message: ChatMessage): Unit = chatRoomActor ! message
+  def sendMessage(message: ChatMessage): Unit = gameActor ! message
 
 }
 

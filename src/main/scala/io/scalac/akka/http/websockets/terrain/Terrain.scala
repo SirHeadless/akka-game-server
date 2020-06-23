@@ -11,6 +11,13 @@ sealed trait Pos {
     case _ => false
   }
 
+  def plusVector(vector: (Int, Int, Int)): Option[Pos] =
+    this.getCubeCoords  match {
+      case CubeCoords(z1,z2,z3)  =>   (CubeCoords _).tupled((z1,z2,z3) |+| vector)
+    }
+//    val (z1,z2,z3) = this.getCubeCoords
+
+
 }
 case class CubeCoords(z1: Int, z2: Int, z3: Int) extends Pos {
   override lazy val getCubeCoords: CubeCoords = this
@@ -39,7 +46,7 @@ trait Terrain {
   val rows: Int
   val maxColumns: Int
 
-  val neighbourVec = for {
+  val neighbourVecs = for {
     a <- List(-1, 0, +1)
     b <- List(-1, 0, +1)
     if (a != b)
@@ -52,7 +59,10 @@ trait Terrain {
   }
 
   def getNeighbours(pos: Pos): List[Pos] = {
+    for {
+      neighbourVec <- neighbourVecs
 
+    }
   }
 
 }
