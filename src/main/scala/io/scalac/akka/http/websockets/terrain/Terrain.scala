@@ -11,31 +11,29 @@ sealed trait Pos {
     case _ => false
   }
 
-  def plusVector(vector: (Int, Int, Int)): Option[Pos] =
+  def plusVector(vector: (Int, Int, Int)): Pos =
     this.getCubeCoords  match {
-      case CubeCoords(z1,z2,z3)  =>   (CubeCoords _).tupled((z1,z2,z3) |+| vector)
+      case cubeCords @ CubeCoords(z1,z2,z3)  => CubeCoords(z1+ vector._1,z2+ vector._2 ,z3 + vector._3)
     }
-//    val (z1,z2,z3) = this.getCubeCoords
-
-
 }
+
 case class CubeCoords(z1: Int, z2: Int, z3: Int) extends Pos {
   override lazy val getCubeCoords: CubeCoords = this
 
   override lazy val getOffsetCoords: OffsetCoords = {
     val offset = z3 % 2
-    val y = z1 + (z3 - offset)/2
-    OffsetCoords(z3, y)
+    val x = z1 + (z3 - offset)/2
+    OffsetCoords(x, z3)
   }
 
 }
 
 case class OffsetCoords(x: Int, y: Int) extends Pos {
   override lazy val getCubeCoords: CubeCoords = {
-    val offset = x % 2
-    val z1 = y - (x - offset)/2
-    val z2 = -y - (x + offset)/2
-    CubeCoords(z1, z2, x)
+    val offset = y % 2
+    val z1 = x - (y - offset)/2
+    val z2 = -(z1 + y)
+    CubeCoords(z1, z2, y)
   }
 
   override lazy val getOffsetCoords: OffsetCoords = this
@@ -46,11 +44,11 @@ trait Terrain {
   val rows: Int
   val maxColumns: Int
 
-  val neighbourVecs = for {
+  val neighbourVecs : List[(Int, Int, Int)] = for {
     a <- List(-1, 0, +1)
     b <- List(-1, 0, +1)
     if (a != b)
-  } yield (a, b, a - b)
+  } yield (a, b, -(a + b))
 
   def terrainFunction: Pos => Boolean = pos => pos.getOffsetCoords match{
     case OffsetCoords(row,col) =>
@@ -59,10 +57,8 @@ trait Terrain {
   }
 
   def getNeighbours(pos: Pos): List[Pos] = {
-    for {
-      neighbourVec <- neighbourVecs
-
-    }
+    if (!terrainFunction(pos)) Nil
+    else neighbourVecs.map(vec => pos.plusVector(vec)).filter(terrainFunction(_))
   }
 
 }

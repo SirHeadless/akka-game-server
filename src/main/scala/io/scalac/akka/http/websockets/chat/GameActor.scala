@@ -1,10 +1,12 @@
 package io.scalac.akka.http.websockets.chat
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
-import io.scalac.akka.http.websockets.state.{GameState, GreenPlayer, Move, Player, YellowPlayer}
+import io.scalac.akka.http.websockets.state.{GameState, GreenPlayer, Move, Player, StateAndChanges, YellowPlayer}
 import io.scalac.akka.http.websockets.terrain.{OffsetCoords, Pos}
 
 import scala.util.{Failure, Random, Success, Try}
+
+case object GameFinished
 
 class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor with ActorLogging {
 
@@ -23,8 +25,10 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
       println(s"User $name joined channel[$roomId]")
       broadcast(participants, s"User $name joined channel[$roomId]")
       val updatedParticipants = participants + (name -> (YellowPlayer(name), actorRef))
-      broadcast(updatedParticipants, startGame.valences.toString())
-      context.become(filedChatRoom(updatedParticipants, Map.empty, startGame))
+      val valencesMessage = startGame.valences.flatten.foldLeft("")((a,b) =>  a + "," + b)
+      println(valencesMessage)
+      broadcast(updatedParticipants, "valences" + valencesMessage)
+      context.become(filledChatRoom(updatedParticipants, Map.empty, startGame))
     }
 
 //    case msg: IncomingMessage => broadcast(participants, msg)
@@ -47,9 +51,17 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
 //    case msg: IncomingMessage => println(s"Game didn't start yet")
 //  }
 
+  def finishedChatRoom(participants: Map[String, (Player, ActorRef)], finalGameState: GameState): Receive = {
+    case GameFinished => {
+      val playerToPoints = participants.flatMap(x => Map(x._2._1 -> finalGameState.calculatePointsOfCapturedFields(x._2._1)))
+      broadcast(participants, "winner" + playerToPoints.flatMap(nameToPoints => List(getPlayerMessageCode(nameToPoints._1).toString, nameToPoints._2.toString ))
+        .foldLeft("")(_+","+_) )
+    }
+  }
+
   implicit def tupleToOffsetCoords(coords: (Int,Int)): OffsetCoords = OffsetCoords(coords._1, coords._2)
 
-  def filedChatRoom(participants: Map[String, (Player, ActorRef)], spectators: Map[String, ActorRef], gameState: GameState): Receive = {
+  def filledChatRoom(participants: Map[String, (Player, ActorRef)], spectators: Map[String, ActorRef], gameState: GameState): Receive = {
     case UserLeft(name) if participants.contains(name) => {
       val newParticipant = participants - name
       println(s"User $name left channel[$roomId]")
@@ -63,7 +75,7 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
     case UserJoined(name, actorRef) =>  {
       println(s"User $name joined channel[$roomId]")
       broadcast(participants, s"User $name joined channel[$roomId]", spectators)
-      context.become(filedChatRoom(participants, spectators + (name -> actorRef), gameState))
+      context.become(filledChatRoom(participants, spectators + (name -> actorRef), gameState))
     }
 
     case msg: IncomingMessage =>
@@ -71,7 +83,7 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
       val stringCoords: Array[String] = msg.message.split(",")
       val player = participants(msg.sender)._1
       // TODO look scala course about TRY and see if you can improve the following commands
-      val result: Try[Either[String, GameState]] =  Try((stringCoords(0).toInt, stringCoords(1).toInt))
+      val result: Try[Either[String, StateAndChanges]] =  Try((stringCoords(0).toInt, stringCoords(1).toInt))
         .map(coords =>{ println(coords); gameState.makeMove(Move(player, coords))})
 
       result match {
@@ -80,9 +92,17 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
             case Left(failure) =>
               // If left send the whole game state to the sender
               println(failure)
-            case Right(gameState) =>
-              broadcast(participants, msg.message + s",${getPlayerMessageCode(player)}", spectators)
-              context.become(filedChatRoom(participants, spectators, gameState))
+            case Right(gameStateAndChanges) =>
+              println(s"CAPTURED FIELDS: ${gameStateAndChanges.gameState.capturedFields}")
+              participants.flatMap(x => Map(x._2._1 -> gameStateAndChanges.gameState.calculatePointsOfCapturedFields(x._2._1))).foreach(x => println("Score: " + x))
+              broadcast(participants, "move," + msg.message + s",${getPlayerMessageCode(player)}", spectators)
+              broadcast(participants, "captured," + getPlayerMessageCode(player) + gameStateAndChanges.stateChanges.nextCapturedFields(player).map(_.getOffsetCoords).flatMap(coords => List(coords.x, coords.y)).foldLeft("")((a, b) =>  a + "," + b))
+              if (gameStateAndChanges.gameState.areAllFieldsCaptured) {
+                context.become(finishedChatRoom(participants, gameStateAndChanges.gameState))
+                context.self !GameFinished
+              }
+              else context.become(filledChatRoom(participants, spectators, gameStateAndChanges.gameState))
+
           }
         }
         case Failure(exception) =>
@@ -93,6 +113,9 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
   }
 
   def broadcast(participants: Map[String, (Player, ActorRef)],  message: ChatMessage, spectators: Map[String, ActorRef] = Map.empty): Unit = {
+    println("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
+    println(message.text)
+    println("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
     participants.values.foreach(_._2 ! message)
     spectators.values.foreach(_ ! message)
   }
@@ -110,9 +133,8 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
     // make implicit
     override val maxColumns: Int = 7
     override val rows: Int = 10
-    override val valences: List[List[Int]] = values(rows, maxColumns)
-    override val capturedFieldsYellow: List[Pos] = List.empty
-    override val capturedFieldsGreen: List[Pos] = List.empty
+    override val valences: List[List[Int]] = values(maxColumns, rows)
+    override val capturedFields: Map[Player, List[Pos]] = Map.empty
   }
 
   def getPlayerMessageCode(player: Player): Int = player match {
