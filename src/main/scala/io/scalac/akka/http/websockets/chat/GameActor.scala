@@ -93,7 +93,8 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
               // If left send the whole game state to the sender
               println(failure)
             case Right(gameStateAndChanges) =>
-              println(s"CAPTURED FIELDS: ${gameStateAndChanges.gameState.capturedFields}")
+              println(startGame.valences)
+              println(s"CAPTURED FIELDS: ${gameStateAndChanges.gameState.capturedFields.flatMap(playerToPositions => Map(playerToPositions._1 -> playerToPositions._2.map(pos => (pos.getOffsetCoords, gameState.valences(pos.getOffsetCoords.y)(pos.getOffsetCoords.x)))))}")
               participants.flatMap(x => Map(x._2._1 -> gameStateAndChanges.gameState.calculatePointsOfCapturedFields(x._2._1))).foreach(x => println("Score: " + x))
               broadcast(participants, "move," + msg.message + s",${getPlayerMessageCode(player)}", spectators)
               broadcast(participants, "captured," + getPlayerMessageCode(player) + gameStateAndChanges.stateChanges.nextCapturedFields(player).map(_.getOffsetCoords).flatMap(coords => List(coords.x, coords.y)).foldLeft("")((a, b) =>  a + "," + b))

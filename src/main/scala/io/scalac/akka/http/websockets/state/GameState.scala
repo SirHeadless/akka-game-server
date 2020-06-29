@@ -99,10 +99,9 @@ trait GameState extends Terrain {
 
 
   def calculatePointsOfCapturedFields(player: Player): Int = {
-    println(capturedFields.getOrElse(player, Nil).map(pos => valences(pos.getOffsetCoords.x)(pos.getOffsetCoords.y)))
-    capturedFields.getOrElse(player, Nil).map(pos => valences(pos.getOffsetCoords.x)(pos.getOffsetCoords.y)).sum
+    println(capturedFields.getOrElse(player, Nil).map(pos => valences(pos.getOffsetCoords.y)(pos.getOffsetCoords.x)))
+    capturedFields.getOrElse(player, Nil).map(pos => valences(pos.getOffsetCoords.y)(pos.getOffsetCoords.x)).sum
   }
-
 }
 
 object GameState {

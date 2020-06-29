@@ -119,6 +119,16 @@ class GameStateSuite extends FunSuite {
     println(gameStateRow6.calculatePointsOfCapturedFields(yellowPlayer))
   }
 
+  test("Valences do not change after move ") {
+    val greenPlayer = GreenPlayer("player1")
+    val yellowPlayer = YellowPlayer("player2")
+    val gameStateRow0 = setFieldsOfRow(0, 10, List(greenPlayer, yellowPlayer), startGame)
+
+    assert(startGame.valences == gameStateRow0.valences)
+
+
+  }
+
   def setFieldsOfRow(row: Int, numberOfFields: Int, players: List[Player], gameState: GameState): GameState = {
     println(row)
     (0 until numberOfFields).foldLeft(gameState)(
