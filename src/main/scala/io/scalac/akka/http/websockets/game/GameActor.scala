@@ -1,7 +1,7 @@
-package io.scalac.akka.http.websockets.chat
+package io.scalac.akka.http.websockets.game
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
-import io.scalac.akka.http.websockets.state.{GameState, GreenPlayer, Move, Player, StateAndChanges, YellowPlayer}
+import io.scalac.akka.http.websockets.state.{GameState, GreenPlayer, Move, Player, StateAndChanges, BluePlayer}
 import io.scalac.akka.http.websockets.terrain.{OffsetCoords, Pos}
 
 import scala.util.{Failure, Random, Success, Try}
@@ -13,7 +13,7 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
 
   override def receive: Receive = {
     case UserLeft(name) => log.warning(s"Not existing user ${name} left the chat room ${roomId}")
-    case UserJoined(name, actorRef) => context.become(playerWaitingChatRoom(Map(name -> (GreenPlayer(name), actorRef))))
+    case UserJoined(name, actorRef) => context.become(Participants(Map(name -> (GreenPlayer(name), actorRef))))
     case msg: IncomingMessage => log.warning(s"Can not broadcast message ${msg} in an empty chat room ${roomId}")
   }
 
@@ -21,7 +21,7 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
     case DeleteGame => context.stop(self)
   }
 
-  def playerWaitingChatRoom(participants: Map[String, (Player, ActorRef)]): Receive = {
+  def playerWaiting(participants: Participants): Receive = {
     case UserLeft(name) => {
       log.info(s"User $name left channel[$roomId]")
       context.become(deletingGame)
@@ -30,58 +30,31 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
     case UserJoined(name, actorRef) =>  {
       log.info(s"User $name joined channel[$roomId]")
       broadcast(participants, s"User $name joined channel[$roomId]")
-      val updatedParticipants = participants + (name -> (YellowPlayer(name), actorRef))
+      val updatedParticipants = participants.add((name -> (BluePlayer(name), actorRef)))
       val valencesMessage = startGame.valences.flatten.foldLeft("")((a,b) =>  a + "," + b)
       println(valencesMessage)
       broadcast(updatedParticipants, "valences" + valencesMessage)
-      context.become(filledChatRoom(updatedParticipants, Map.empty, startGame))
+      context.become(gameStarted(updatedParticipants, Map.empty, startGame))
     }
 
-//    case msg: IncomingMessage => broadcast(participants, msg)
     case msg: IncomingMessage => println(s"Game didn't start yet")
   }
 
-//  def gameStartedChatRoom(participants: Map[String, ActorRef]): Receive = {
-//    case UserLeft(name) => {
-//      println(s"User $name left channel[$roomId]")
-//      broadcast(participants, "Player 1 Won Match")
-//      context.become(receive)
-//    }
-//    case UserJoined(name, actorRef) =>  {
-//      println(s"User $name joined channel[$roomId]")
-//      broadcast(participants, s"User $name joined channel[$roomId]")
-//      context.become(gameStartedChatRoom(participants + (name -> actorRef)))
-//    }
-//
-//    //    case msg: IncomingMessage => broadcast(participants, msg)
-//    case msg: IncomingMessage => println(s"Game didn't start yet")
-//  }
-
-  def finishedChatRoom(participants: Map[String, (Player, ActorRef)], finalGameState: GameState): Receive = {
-    case GameFinished => {
-      val playerToPoints = participants.flatMap(x => Map(x._2._1 -> finalGameState.calculatePointsOfCapturedFields(x._2._1)))
-      broadcast(participants, "winner" + playerToPoints.flatMap(nameToPoints => List(getPlayerMessageCode(nameToPoints._1).toString, nameToPoints._2.toString ))
-        .foldLeft("")(_+","+_) )
-    }
-  }
-
-  implicit def tupleToOffsetCoords(coords: (Int,Int)): OffsetCoords = OffsetCoords(coords._1, coords._2)
-
-  def filledChatRoom(participants: Map[String, (Player, ActorRef)], spectators: Map[String, ActorRef], gameState: GameState): Receive = {
-    case UserLeft(name) if participants.contains(name) => {
-      val newParticipant = participants - name
+  def gameStarted(participants: Participants, spectators: Map[String, ActorRef], gameState: GameState): Receive = {
+    case UserLeft(name) => {
+      val newParticipant = participants.remove(name)
       println(s"User $name left channel[$roomId]")
       broadcast(participants, s"User $name left channel[$roomId]", spectators)
       if (newParticipant.isEmpty) {
         context.become(receive)
       } else {
-        context.become(playerWaitingChatRoom(newParticipant))
+        context.become(playerWaiting(newParticipant))
       }
     }
     case UserJoined(name, actorRef) =>  {
       println(s"User $name joined channel[$roomId]")
       broadcast(participants, s"User $name joined channel[$roomId]", spectators)
-      context.become(filledChatRoom(participants, spectators + (name -> actorRef), gameState))
+      context.become(gameStarted(participants, spectators + (name -> actorRef), gameState))
     }
 
     case msg: IncomingMessage =>
@@ -105,10 +78,10 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
               broadcast(participants, "move," + msg.message + s",${getPlayerMessageCode(player)}", spectators)
               broadcast(participants, "captured," + getPlayerMessageCode(player) + gameStateAndChanges.stateChanges.nextCapturedFields(player).map(_.getOffsetCoords).flatMap(coords => List(coords.x, coords.y)).foldLeft("")((a, b) =>  a + "," + b))
               if (gameStateAndChanges.gameState.areAllFieldsCaptured) {
-                context.become(finishedChatRoom(participants, gameStateAndChanges.gameState))
+                context.become(gameFinished(participants, gameStateAndChanges.gameState))
                 context.self !GameFinished
               }
-              else context.become(filledChatRoom(participants, spectators, gameStateAndChanges.gameState))
+              else context.become(gameStarted(participants, spectators, gameStateAndChanges.gameState))
 
           }
         }
@@ -119,11 +92,23 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
 
   }
 
-  def broadcast(participants: Map[String, (Player, ActorRef)],  message: ChatMessage, spectators: Map[String, ActorRef] = Map.empty): Unit = {
-    println("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-    println(message.text)
-    println("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-    participants.values.foreach(_._2 ! message)
+  def gameFinished(participants: Map[String, (Player, ActorRef)], finalGameState: GameState): Receive = {
+    case GameFinished => {
+      val playerToPoints = participants.flatMap(x => Map(x._2._1 -> finalGameState.calculatePointsOfCapturedFields(x._2._1)))
+      broadcast(participants, "winner" + playerToPoints.flatMap(nameToPoints => List(getPlayerMessageCode(nameToPoints._1).toString, nameToPoints._2.toString ))
+        .foldLeft("")(_+","+_) )
+    }
+  }
+
+  implicit def tupleToOffsetCoords(coords: (Int,Int)): OffsetCoords = OffsetCoords(coords._1, coords._2)
+
+
+
+  def broadcast(participants: Participants, message: GameMessage, spectators: Map[String, ActorRef] = Map.empty): Unit = {
+    log.info("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
+    log.info(message.text)
+    log.info("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
+    participants match { case ConnectedParticipants(participants) => participants.values.foreach(_._2 ! message) }
     spectators.values.foreach(_ ! message)
   }
 
@@ -146,6 +131,6 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
 
   def getPlayerMessageCode(player: Player): Int = player match {
     case GreenPlayer(_) => 0
-    case YellowPlayer(_) => 1
+    case BluePlayer(_) => 1
   }
 }

@@ -1,4 +1,4 @@
-package io.scalac.akka.http.websockets.chat
+package io.scalac.akka.http.websockets.game
 
 import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
@@ -6,13 +6,13 @@ import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.GraphDSL.Implicits._
 import akka.stream.scaladsl.{Source, _}
 
-class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
+class GameRoom(roomId: Int, actorSystem: ActorSystem) {
 
   private[this] val gameActor = actorSystem.actorOf(Props(classOf[GameActor], roomId, 7, 10))
 
 
   def websocketFlow(user: String): Flow[Message, Message, _] =
-    Flow.fromGraph(GraphDSL.create(Source.actorRef[ChatMessage](bufferSize = 5, OverflowStrategy.fail))  {
+    Flow.fromGraph(GraphDSL.create(Source.actorRef[GameMessage](bufferSize = 5, OverflowStrategy.fail))  {
       implicit builder =>
         chatSource =>
           //flow used as input it takes Message's
@@ -23,17 +23,17 @@ class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
 
           //flow used as output, it returns Message's
           val backToWebsocket = builder.add(
-            Flow[ChatMessage].map {
+            Flow[GameMessage].map {
 //              case ChatMessage(author, text) => TextMessage(s"[$author]: $text")
-              case ChatMessage(author, text) => TextMessage(text)
+              case GameMessage(author, text) => TextMessage(text)
             }
           )
 
           //send messages to the actor, if send also UserLeft(user) before stream completes.
-          val chatActorSink = Sink.actorRef[ChatEvent](gameActor, UserLeft(user))
+          val chatActorSink = Sink.actorRef[GameEvent](gameActor, UserLeft(user))
 
           //merges both pipes
-          val merge = builder.add(Merge[ChatEvent](2))
+          val merge = builder.add(Merge[GameEvent](2))
 
           //Materialized value of Actor who sit in chatroom
           val actorAsSource = builder.materializedValue.map(actor => UserJoined(user, actor))
@@ -53,10 +53,10 @@ class ChatRoom(roomId: Int, actorSystem: ActorSystem) {
           FlowShape(fromWebsocket.in , backToWebsocket.out)
     })
 
-  def sendMessage(message: ChatMessage): Unit = gameActor ! message
+  def sendMessage(message: GameMessage): Unit = gameActor ! message
 
 }
 
-object ChatRoom {
-  def apply(roomId: Int)(implicit actorSystem: ActorSystem) = new ChatRoom(roomId, actorSystem)
+object GameRoom {
+  def apply(roomId: Int)(implicit actorSystem: ActorSystem) = new GameRoom(roomId, actorSystem)
 }

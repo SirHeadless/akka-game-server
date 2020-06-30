@@ -27,7 +27,7 @@ class GameStateSuite extends FunSuite {
   }
 
   test("Test capturedFields in the game state") {
-    val yellowPlayer = YellowPlayer("player1")
+    val yellowPlayer = BluePlayer("player1")
     val greenPlayer = GreenPlayer("player2")
     val gameState = for {
       gameStateAndChanges1 <- startGame.makeMove(Move(greenPlayer, OffsetCoords(0,0)))
@@ -43,7 +43,7 @@ class GameStateSuite extends FunSuite {
   }
 
   test("Test capturedFields in the game state 2") {
-    val yellowPlayer = YellowPlayer("player1")
+    val yellowPlayer = BluePlayer("player1")
     val greenPlayer = GreenPlayer("player2")
     val gameState = for {
       gameStateAndChanges1 <- startGame.makeMove(Move(greenPlayer, OffsetCoords(1,1)))
@@ -64,7 +64,7 @@ class GameStateSuite extends FunSuite {
   }
 
   test("Test capturedFields in the game state 3") {
-    val yellowPlayer = YellowPlayer("player1")
+    val yellowPlayer = BluePlayer("player1")
     val greenPlayer = GreenPlayer("player2")
     val gameState = for {
       gameStateAndChanges1 <- startGame.makeMove(Move(greenPlayer, OffsetCoords(4,2)))
@@ -86,7 +86,7 @@ class GameStateSuite extends FunSuite {
   }
 
   test("Test calculatePointsOfCapturedFields") {
-    val yellowPlayer = YellowPlayer("player1")
+    val yellowPlayer = BluePlayer("player1")
     val greenPlayer = GreenPlayer("player2")
     val gameState = for {
       gameStateAndChanges1 <- startGame.makeMove(Move(greenPlayer, OffsetCoords(4,2)))
@@ -106,7 +106,7 @@ class GameStateSuite extends FunSuite {
 
   test("Test calculatePointsOfCapturedFields2 ") {
     val greenPlayer = GreenPlayer("player1")
-    val yellowPlayer = YellowPlayer("player2")
+    val yellowPlayer = BluePlayer("player2")
     val gameStateRow0 = setFieldsOfRow(0, 10, List(greenPlayer, yellowPlayer), startGame)
     val gameStateRow1 = setFieldsOfRow(1,9, List(greenPlayer, yellowPlayer), gameStateRow0)
     val gameStateRow2 = setFieldsOfRow(2,10, List(yellowPlayer, greenPlayer), gameStateRow1)
@@ -121,7 +121,7 @@ class GameStateSuite extends FunSuite {
 
   test("Valences do not change after move ") {
     val greenPlayer = GreenPlayer("player1")
-    val yellowPlayer = YellowPlayer("player2")
+    val yellowPlayer = BluePlayer("player2")
     val gameStateRow0 = setFieldsOfRow(0, 10, List(greenPlayer, yellowPlayer), startGame)
 
     assert(startGame.valences == gameStateRow0.valences)

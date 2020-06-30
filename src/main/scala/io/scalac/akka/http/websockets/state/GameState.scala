@@ -23,7 +23,7 @@ trait Player {
 
 case class GreenPlayer(name: String) extends Player
 
-case class YellowPlayer(name: String) extends Player
+case class BluePlayer(name: String) extends Player
 
 case class Move(player: Player, pos: Pos)
 
