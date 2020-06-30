@@ -7,6 +7,7 @@ import io.scalac.akka.http.websockets.terrain.{OffsetCoords, Pos}
 import scala.util.{Failure, Random, Success, Try}
 
 case object GameFinished
+case object DeleteGame
 
 class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor with ActorLogging {
 
@@ -16,13 +17,18 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
     case msg: IncomingMessage => log.warning(s"Can not broadcast message ${msg} in an empty chat room ${roomId}")
   }
 
+  def deletingGame: Receive = {
+    case DeleteGame => context.stop(self)
+  }
+
   def playerWaitingChatRoom(participants: Map[String, (Player, ActorRef)]): Receive = {
     case UserLeft(name) => {
-      println(s"User $name left channel[$roomId]")
-      context.become(receive)
+      log.info(s"User $name left channel[$roomId]")
+      context.become(deletingGame)
+      context.self ! DeleteGame
     }
     case UserJoined(name, actorRef) =>  {
-      println(s"User $name joined channel[$roomId]")
+      log.info(s"User $name joined channel[$roomId]")
       broadcast(participants, s"User $name joined channel[$roomId]")
       val updatedParticipants = participants + (name -> (YellowPlayer(name), actorRef))
       val valencesMessage = startGame.valences.flatten.foldLeft("")((a,b) =>  a + "," + b)
