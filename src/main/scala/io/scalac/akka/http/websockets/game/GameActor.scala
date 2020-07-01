@@ -13,7 +13,7 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
 
   override def receive: Receive = {
     case UserLeft(name) => log.warning(s"Not existing user ${name} left the chat room ${roomId}")
-    case UserJoined(name, actorRef) => context.become(Participants(Map(name -> (GreenPlayer(name), actorRef))))
+    case UserJoined(name, actorRef) => context.become(playerWaiting(OneParticipant(ParticipantInformation(name, GreenPlayer(name), actorRef))))
     case msg: IncomingMessage => log.warning(s"Can not broadcast message ${msg} in an empty chat room ${roomId}")
   }
 
@@ -24,20 +24,19 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
   def playerWaiting(participants: Participants): Receive = {
     case UserLeft(name) => {
       log.info(s"User $name left channel[$roomId]")
+
       context.become(deletingGame)
       context.self ! DeleteGame
     }
     case UserJoined(name, actorRef) =>  {
       log.info(s"User $name joined channel[$roomId]")
       broadcast(participants, s"User $name joined channel[$roomId]")
-      val updatedParticipants = participants.add((name -> (BluePlayer(name), actorRef)))
+      val updatedParticipants = participants.add(ParticipantInformation(name, BluePlayer(name), actorRef))
       val valencesMessage = startGame.valences.flatten.foldLeft("")((a,b) =>  a + "," + b)
-      println(valencesMessage)
+
       broadcast(updatedParticipants, "valences" + valencesMessage)
       context.become(gameStarted(updatedParticipants, Map.empty, startGame))
     }
-
-    case msg: IncomingMessage => println(s"Game didn't start yet")
   }
 
   def gameStarted(participants: Participants, spectators: Map[String, ActorRef], gameState: GameState): Receive = {
@@ -45,11 +44,8 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
       val newParticipant = participants.remove(name)
       println(s"User $name left channel[$roomId]")
       broadcast(participants, s"User $name left channel[$roomId]", spectators)
-      if (newParticipant.isEmpty) {
-        context.become(receive)
-      } else {
-        context.become(playerWaiting(newParticipant))
-      }
+      context.become(gameStarted(newParticipant, spectators, gameState))
+
     }
     case UserJoined(name, actorRef) =>  {
       println(s"User $name joined channel[$roomId]")
@@ -60,37 +56,25 @@ class GameActor(roomId: Int, boardRows: Int, boardColumns: Int) extends Actor wi
     case msg: IncomingMessage =>
       // TODO: Implement a better protocol to send messages (msgpack.org?)
       val stringCoords: Array[String] = msg.message.split(",")
-      val player = participants(msg.sender)._1
+      val player: Option[Player] = participants.getParticipantInformation(msg.sender).map(_.player)
       // TODO look scala course about TRY and see if you can improve the following commands
-      val result: Try[Either[String, StateAndChanges]] =  Try((stringCoords(0).toInt, stringCoords(1).toInt))
-        .map(coords =>{ println(coords); gameState.makeMove(Move(player, coords))})
-
-      result match {
-        case Success(value) => {
-          value match {
-            case Left(failure) =>
-              // If left send the whole game state to the sender
-              println(failure)
-            case Right(gameStateAndChanges) =>
-              println(startGame.valences)
-              println(s"CAPTURED FIELDS: ${gameStateAndChanges.gameState.capturedFields.flatMap(playerToPositions => Map(playerToPositions._1 -> playerToPositions._2.map(pos => (pos.getOffsetCoords, gameState.valences(pos.getOffsetCoords.y)(pos.getOffsetCoords.x)))))}")
-              participants.flatMap(x => Map(x._2._1 -> gameStateAndChanges.gameState.calculatePointsOfCapturedFields(x._2._1))).foreach(x => println("Score: " + x))
-              broadcast(participants, "move," + msg.message + s",${getPlayerMessageCode(player)}", spectators)
-              broadcast(participants, "captured," + getPlayerMessageCode(player) + gameStateAndChanges.stateChanges.nextCapturedFields(player).map(_.getOffsetCoords).flatMap(coords => List(coords.x, coords.y)).foldLeft("")((a, b) =>  a + "," + b))
-              if (gameStateAndChanges.gameState.areAllFieldsCaptured) {
-                context.become(gameFinished(participants, gameStateAndChanges.gameState))
-                context.self !GameFinished
-              }
-              else context.become(gameStarted(participants, spectators, gameStateAndChanges.gameState))
-
-          }
+      val coordsTry:  Try[Move] =  player.fold(Failure(new Exception("Player Not Found")): Try[Move])(player => Try(Move(player,(stringCoords(0).toInt, stringCoords(1).toInt))))
+      val gameStateEither: Either[String, StateAndChanges] = coordsTry.fold(exception => Left(exception.getMessage), gameState.makeMove)
+      gameStateEither.fold[Unit](log.warning(_), gameStateAndChanges => {
+        println(startGame.valences)
+        println(s"CAPTURED FIELDS: ${gameStateAndChanges.gameState.capturedFields.flatMap(playerToPositions => Map(playerToPositions._1 -> playerToPositions._2.map(pos => (pos.getOffsetCoords, gameState.valences(pos.getOffsetCoords.y)(pos.getOffsetCoords.x)))))}")
+        participants.getParticipantInformation.foreach(playerInfo => println("Score: " + gameStateAndChanges.gameState.calculatePointsOfCapturedFields(playerInfo.player)))
+        broadcast(participants, "move," + msg.message + s",${getPlayerMessageCode(player)}", spectators)
+        broadcast(participants, "captured," + getPlayerMessageCode(player) + gameStateAndChanges.stateChanges.nextCapturedFields(player).map(_.getOffsetCoords).flatMap(coords => List(coords.x, coords.y)).foldLeft("")((a, b) =>  a + "," + b))
+        if (gameStateAndChanges.gameState.areAllFieldsCaptured) {
+          context.become(gameFinished(participants, gameStateAndChanges.gameState))
+          context.self !GameFinished
         }
-        case Failure(exception) =>
-          println(exception)
-      }
-
+        else context.become(gameStarted(participants, spectators, gameStateAndChanges.gameState))
+      })
 
   }
+
 
   def gameFinished(participants: Map[String, (Player, ActorRef)], finalGameState: GameState): Receive = {
     case GameFinished => {
